@@ -1,9 +1,9 @@
 /**
-   Licensed to the Apache Software Foundation (ASF) under one or more 
-   contributor license agreements.  See the NOTICE file distributed with 
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
    this work for additional information regarding copyright ownership.
    The ASF licenses this file to You under the Apache License, Version 2.0
-   (the "License"); you may not use this file except in compliance with 
+   (the "License"); you may not use this file except in compliance with
    the License.  You may obtain a copy of the License at
 
        http://www.apache.org/licenses/LICENSE-2.0
@@ -89,8 +89,22 @@ fromClause
 joinSource
 @init { gParent.pushMsg("join source", state); }
 @after { gParent.popMsg(state); }
-    : fromSource ( joinToken^ fromSource ( KW_ON! expression {$joinToken.start.getType() != COMMA}? )? )*
+    : fromSource (joinToken^ fromSource ( KW_ON! expression {$joinToken.start.getType() != COMMA}? )?)*
     | uniqueJoinToken^ uniqueJoinSource (COMMA! uniqueJoinSource)+
+    ;
+
+joinToken
+@init { gParent.pushMsg("join type specifier", state); }
+@after { gParent.popMsg(state); }
+    :
+      KW_JOIN                        -> TOK_JOIN
+    | KW_INNER KW_JOIN               -> TOK_JOIN
+    | COMMA                          -> TOK_JOIN
+    | KW_CROSS KW_JOIN               -> TOK_CROSSJOIN
+    | KW_LEFT  (KW_OUTER)? KW_JOIN   -> TOK_LEFTOUTERJOIN
+    | KW_RIGHT (KW_OUTER)? KW_JOIN   -> TOK_RIGHTOUTERJOIN
+    | KW_FULL  (KW_OUTER)? KW_JOIN   -> TOK_FULLOUTERJOIN
+    | KW_LEFT KW_SEMI KW_JOIN        -> TOK_LEFTSEMIJOIN
     ;
 
 uniqueJoinSource
@@ -111,18 +125,11 @@ uniqueJoinToken
 @after { gParent.popMsg(state); }
     : KW_UNIQUEJOIN -> TOK_UNIQUEJOIN;
 
-joinToken
-@init { gParent.pushMsg("join type specifier", state); }
+lateralViewOrUnnest
+@init { gParent.pushMsg("lateralView Or Unnest source", state); }
 @after { gParent.popMsg(state); }
     :
-      KW_JOIN                      -> TOK_JOIN
-    | KW_INNER KW_JOIN             -> TOK_JOIN
-    | COMMA                        -> TOK_JOIN
-    | KW_CROSS KW_JOIN             -> TOK_CROSSJOIN
-    | KW_LEFT  (KW_OUTER)? KW_JOIN -> TOK_LEFTOUTERJOIN
-    | KW_RIGHT (KW_OUTER)? KW_JOIN -> TOK_RIGHTOUTERJOIN
-    | KW_FULL  (KW_OUTER)? KW_JOIN -> TOK_FULLOUTERJOIN
-    | KW_LEFT KW_SEMI KW_JOIN      -> TOK_LEFTSEMIJOIN
+    lateralView | unnest
     ;
 
 lateralView
@@ -135,6 +142,30 @@ lateralView
 	KW_LATERAL KW_VIEW function tableAlias (KW_AS identifier ((COMMA)=> COMMA identifier)*)?
 	-> ^(TOK_LATERAL_VIEW ^(TOK_SELECT ^(TOK_SELEXPR function identifier* tableAlias)))
 	;
+
+unnest
+@init { gParent.pushMsg("unnest", state); }
+@after { gParent.popMsg(state); }
+    :
+    unnestToken^ arraySource (KW_ON! expression)? (KW_AS!)? tableAlias
+    ;
+
+arraySource
+@init { gParent.pushMsg("array identifier", state); }
+@after { gParent.popMsg(state); }
+    :
+      identifier -> ^(TOK_TABLE_OR_COL identifier)
+    | tab=identifier DOT col=identifier -> ^(DOT ^(TOK_TABLE_OR_COL $tab) $col)
+    ;
+
+unnestToken
+@init { gParent.pushMsg("unnest type specifier", state); }
+@after { gParent.popMsg(state); }
+    :
+      KW_UNNEST                      -> TOK_UNNEST
+    | KW_INNER KW_UNNEST             -> TOK_UNNEST
+    | KW_LEFT  (KW_OUTER)? KW_UNNEST -> TOK_LEFTOUTERUNNEST
+    ;
 
 tableAlias
 @init {gParent.pushMsg("table alias", state); }
@@ -152,12 +183,11 @@ fromSource
     | fromSource0
     ;
 
-
 fromSource0
 @init { gParent.pushMsg("from source 0", state); }
 @after { gParent.popMsg(state); }
     :
-    ((Identifier LPAREN)=> partitionedTableFunction | tableSource | subQuerySource | virtualTableSource) (lateralView^)*
+    ((Identifier LPAREN)=> partitionedTableFunction | tableSource | subQuerySource | virtualTableSource) (lateralViewOrUnnest^)*
     ;
 
 tableBucketSample
@@ -190,10 +220,10 @@ tableSample
 tableSource
 @init { gParent.pushMsg("table source", state); }
 @after { gParent.popMsg(state); }
-    : tabname=tableName 
+    : tabname=tableName
     ((tableProperties) => props=tableProperties)?
-    ((tableSample) => ts=tableSample)? 
-    ((KW_AS) => (KW_AS alias=identifier) 
+    ((tableSample) => ts=tableSample)?
+    ((KW_AS) => (KW_AS alias=identifier)
     |
     (identifier) => (alias=identifier))?
     -> ^(TOK_TABREF $tabname $props? $ts? $alias?)
@@ -228,7 +258,7 @@ subQuerySource
 //---------------------- Rules for parsing PTF clauses -----------------------------
 partitioningSpec
 @init { gParent.pushMsg("partitioningSpec clause", state); }
-@after { gParent.popMsg(state); } 
+@after { gParent.popMsg(state); }
    :
    partitionByClause orderByClause? -> ^(TOK_PARTITIONINGSPEC partitionByClause orderByClause?) |
    orderByClause -> ^(TOK_PARTITIONINGSPEC orderByClause) |
@@ -239,7 +269,7 @@ partitioningSpec
 
 partitionTableFunctionSource
 @init { gParent.pushMsg("partitionTableFunctionSource clause", state); }
-@after { gParent.popMsg(state); } 
+@after { gParent.popMsg(state); }
    :
    subQuerySource |
    tableSource |
@@ -248,14 +278,14 @@ partitionTableFunctionSource
 
 partitionedTableFunction
 @init { gParent.pushMsg("ptf clause", state); }
-@after { gParent.popMsg(state); } 
+@after { gParent.popMsg(state); }
    :
-   name=Identifier LPAREN KW_ON 
+   name=Identifier LPAREN KW_ON
    ((partitionTableFunctionSource) => (ptfsrc=partitionTableFunctionSource spec=partitioningSpec?))
    ((Identifier LPAREN expression RPAREN ) => Identifier LPAREN expression RPAREN ( COMMA Identifier LPAREN expression RPAREN)*)?
    ((RPAREN) => (RPAREN)) ((Identifier) => alias=Identifier)?
    ->   ^(TOK_PTBLFUNCTION $name $alias? $ptfsrc $spec? expression*)
-   ; 
+   ;
 
 //----------------------- Rules for parsing whereClause -----------------------------
 // where a=b and ...

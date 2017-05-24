@@ -24,7 +24,7 @@ ASTLabelType=CommonTree;
 backtrack=false;
 k=3;
 }
-import SelectClauseParser, FromClauseParser, IdentifiersParser;
+import SelectClauseParser, FromClauseParser, IdentifiersParser, IdentifiersParser2;
 
 tokens {
 TOK_INSERT;
@@ -94,6 +94,8 @@ TOK_RIGHTOUTERJOIN;
 TOK_FULLOUTERJOIN;
 TOK_UNIQUEJOIN;
 TOK_CROSSJOIN;
+TOK_UNNEST;
+TOK_LEFTOUTERUNNEST;
 TOK_LOAD;
 TOK_EXPORT;
 TOK_IMPORT;
@@ -427,6 +429,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
     xlateMap.put("KW_OVERWRITE", "OVERWRITE");
     xlateMap.put("KW_OUTER", "OUTER");
     xlateMap.put("KW_JOIN", "JOIN");
+    xlateMap.put("KW_UNNEST", "UNNEST");
     xlateMap.put("KW_LEFT", "LEFT");
     xlateMap.put("KW_RIGHT", "RIGHT");
     xlateMap.put("KW_FULL", "FULL");
@@ -2472,7 +2475,7 @@ body
    :
    insertClause
    selectClause
-   lateralView?
+   lateralViewOrUnnest?
    whereClause?
    groupByClause?
    havingClause?
@@ -2482,11 +2485,11 @@ body
    sortByClause?
    window_clause?
    limitClause? -> ^(TOK_INSERT insertClause
-                     selectClause lateralView? whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
+                     selectClause lateralViewOrUnnest? whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
                      distributeByClause? sortByClause? window_clause? limitClause?)
    |
    selectClause
-   lateralView?
+   lateralViewOrUnnest?
    whereClause?
    groupByClause?
    havingClause?
@@ -2496,7 +2499,7 @@ body
    sortByClause?
    window_clause?
    limitClause? -> ^(TOK_INSERT ^(TOK_DESTINATION ^(TOK_DIR TOK_TMP_FILE))
-                     selectClause lateralView? whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
+                     selectClause lateralViewOrUnnest? whereClause? groupByClause? havingClause? orderByClause? clusterByClause?
                      distributeByClause? sortByClause? window_clause? limitClause?)
    ;
 

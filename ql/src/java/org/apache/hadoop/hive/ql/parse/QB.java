@@ -22,11 +22,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.Path;
@@ -43,6 +46,7 @@ public class QB {
   private static final Logger LOG = LoggerFactory.getLogger("hive.ql.parse.QB");
 
   private final int numJoins = 0;
+  private final int numUnnests = 0;
   private final int numGbys = 0;
   private int numSels = 0;
   private int numSelDi = 0;
@@ -54,6 +58,7 @@ public class QB {
   private QBParseInfo qbp;
   private QBMetaData qbm;
   private QBJoinTree qbjoin;
+  private List<QBUnnestTree> qbUnnestTrees;
   private String id;
   private boolean isQuery;
   private boolean isAnalyzeRewrite;
@@ -117,6 +122,7 @@ public class QB {
     viewAliasToViewSchema = new LinkedHashMap<String, Table>();
     aliasToProps = new LinkedHashMap<String, Map<String, String>>();
     aliases = new ArrayList<String>();
+    qbUnnestTrees = new ArrayList<QBUnnestTree>();
     if (alias != null) {
       alias = alias.toLowerCase();
     }
@@ -213,6 +219,10 @@ public class QB {
     return numJoins;
   }
 
+  public int getNumUnnests() {
+      return numUnnests;
+  }
+
   public Set<String> getSubqAliases() {
     return aliasToSubq.keySet();
   }
@@ -257,6 +267,14 @@ public class QB {
 
   public void setQbJoinTree(QBJoinTree qbjoin) {
     this.qbjoin = qbjoin;
+  }
+
+  public List<QBUnnestTree> getQbUnnestTrees() {
+    return qbUnnestTrees;
+  }
+
+  public void setQbUnnestTrees(List<QBUnnestTree> qbUnnestTrees) {
+    this.qbUnnestTrees = qbUnnestTrees;
   }
 
   public void setIsQuery(boolean isQuery) {

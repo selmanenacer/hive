@@ -27,15 +27,10 @@ import java.util.Stack;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterators;
 
+import org.apache.hadoop.hive.ql.exec.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.FilterOperator;
-import org.apache.hadoop.hive.ql.exec.LateralViewForwardOperator;
-import org.apache.hadoop.hive.ql.exec.Operator;
-import org.apache.hadoop.hive.ql.exec.PTFOperator;
-import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
-import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.GraphWalker;
@@ -101,10 +96,12 @@ public class IdentityProjectRemover extends Transform {
     	
       SelectOperator sel = (SelectOperator)nd;
       List<Operator<? extends OperatorDesc>> parents = sel.getParentOperators();
-      if (parents.size() != 1 || parents.get(0) instanceof LateralViewForwardOperator) {
+      if (parents.size() != 1 || parents.get(0) instanceof LateralViewForwardOperator
+          || parents.get(0) instanceof UnnestForwardOperator) {
         // Multi parents, cant handle that.
         // Right now, we do not remove projection on top of
-        // LateralViewForward operators.
+        // LateralViewForward operators or
+        // UnnestForward operators.
         return null;
       }
       Operator<? extends OperatorDesc> parent = parents.get(0);
